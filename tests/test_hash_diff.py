@@ -15,7 +15,9 @@ import os
 # Allow importing main.py from the project root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import pytest
 from main import compute_hash
+from uploader import parse_display_name
 
 
 class TestComputeHash:
@@ -83,3 +85,47 @@ class TestComputeHash:
         h = compute_hash("some content")
         assert len(h) == 64
         assert all(c in "0123456789abcdef" for c in h)
+
+    def test_hash8_different_articles(self) -> None:
+        """
+        Verify two different articles produce different 8-character hash prefixes.
+        Note: We accept a tiny 1-in-4.2-billion collision risk (8 hex chars = 32 bits)
+        as a documented tradeoff for shorter, more readable filenames in the store.
+        """
+        hash1 = compute_hash("Article one content")[:8]
+        hash2 = compute_hash("Article two content")[:8]
+        assert hash1 != hash2
+
+
+class TestParseDisplayName:
+    """Tests for the parse_display_name helper in uploader.py."""
+
+    def test_valid_display_name(self) -> None:
+        """Correctly parses slug and hash8."""
+        slug, hash8 = parse_display_name("getting-started__a1b2c3d4.md")
+        assert slug == "getting-started"
+        assert hash8 == "a1b2c3d4"
+
+    def test_slug_with_underscores(self) -> None:
+        """
+        Splits on the *last* '__', so a slug containing '__' is parsed correctly.
+        (slugify() usually converts to hyphens, but we test defensively.)
+        """
+        slug, hash8 = parse_display_name("weird__slug__name__e5f6g7h8.md")
+        assert slug == "weird__slug__name"
+        assert hash8 == "e5f6g7h8"
+
+    def test_missing_md_extension(self) -> None:
+        """Raises ValueError if not ending with .md."""
+        with pytest.raises(ValueError, match="Must end with .md"):
+            parse_display_name("getting-started__a1b2c3d4")
+
+    def test_missing_separator(self) -> None:
+        """Raises ValueError if '__' separator is missing."""
+        with pytest.raises(ValueError, match="Must contain __ separator"):
+            parse_display_name("getting-started-a1b2c3d4.md")
+
+    def test_empty_string(self) -> None:
+        """Raises ValueError on empty string."""
+        with pytest.raises(ValueError, match="Must end with .md"):
+            parse_display_name("")

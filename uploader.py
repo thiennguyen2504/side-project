@@ -111,12 +111,67 @@ def get_or_create_store(client: genai.Client) -> types.FileSearchStore:
     return store
 
 
+# ── Store index ────────────────────────────────────────────────────────────────
+
+def parse_display_name(display_name: str) -> tuple[str, str]:
+    """
+    Parse a {slug}__{hash8}.md display_name back into its components.
+    
+    Returns:
+        tuple of (slug, hash8)
+        
+    Raises:
+        ValueError if the display_name doesn't match the expected format.
+    """
+    if not display_name or not display_name.endswith(".md"):
+        raise ValueError("Must end with .md")
+    base_name = display_name[:-3]
+    if "__" not in base_name:
+        raise ValueError("Must contain __ separator")
+    return base_name.rsplit("__", 1)
+
+
+def get_store_index(client: genai.Client, store_name: str) -> dict[str, dict]:
+    """
+    List all documents currently in the File Search Store.
+    Parse each document's display_name back into (slug, hash8).
+
+    Expected display_name format: {slug}__{hash8}.md
+
+    Returns:
+        Dict mapping slug → {"hash8": str, "document_name": str}
+    """
+    index = {}
+
+    pager = _with_retry(
+        client.file_search_stores.documents.list,
+        parent=store_name,
+        label="list_documents",
+    )
+
+    for doc in pager:
+        display_name = getattr(doc, "display_name", "")
+        try:
+            slug, hash8 = parse_display_name(display_name)
+        except ValueError as exc:
+            logger.debug("Skipping document with unexpected display_name '%s': %s", display_name, exc)
+            continue
+
+        index[slug] = {
+            "hash8": hash8,
+            "document_name": doc.name,
+        }
+
+    return index
+
+
 # ── Document upload ────────────────────────────────────────────────────────────
 
 def upload_document(
     client: genai.Client,
     store_name: str,
     file_path: Path,
+    display_name: Optional[str] = None,
 ) -> Optional["DocRef"]:
     """
     Upload a single Markdown file to the File Search Store.
@@ -125,10 +180,13 @@ def upload_document(
         client: Authenticated Gemini client.
         store_name: Fully-qualified store resource name.
         file_path: Path to the local .md file.
+        display_name: Custom display name for the store. Defaults to file_path.name.
 
     Returns:
         A DocRef(name=document_resource_name), or None on failure.
     """
+    if display_name is None:
+        display_name = file_path.name
     try:
         content = file_path.read_bytes()
         file_obj = io.BytesIO(content)
@@ -139,21 +197,21 @@ def upload_document(
             file=file_obj,
             config=types.UploadToFileSearchStoreConfig(
                 mime_type="text/plain",
-                display_name=file_path.name,
+                display_name=display_name,
             ),
-            label=f"upload:{file_path.name}",
+            label=f"upload:{display_name}",
         )
         # upload_to_file_search_store is synchronous — response is already populated.
         # Structure: operation.response.document_name = 'fileSearchStores/.../documents/...'
         response = getattr(operation, "response", None)
         doc_name = getattr(response, "document_name", None)
         if not doc_name:
-            logger.warning("Upload returned no document_name for '%s'", file_path.name)
+            logger.warning("Upload returned no document_name for '%s'", display_name)
             return None
-        logger.debug("Uploaded: %s → %s", file_path.name, doc_name)
+        logger.debug("Uploaded: %s → %s", display_name, doc_name)
         return DocRef(name=doc_name)
     except Exception as exc:
-        logger.error("Failed to upload '%s': %s", file_path.name, exc)
+        logger.error("Failed to upload '%s': %s", display_name, exc)
         return None
 
 
@@ -210,6 +268,8 @@ def upload_all(
 ) -> dict[str, str]:
     """
     Upload a list of Markdown files to the store, logging progress.
+    (Note: Typically driven by main.py's diff logic now, so might be unused
+    or used for initial bulk upload without hashes.)
 
     Args:
         client: Authenticated Gemini client.

@@ -38,7 +38,7 @@ scraper.py → clean Markdown  →  main.py (SHA-256 delta) → uploader.py (Gem
 
 **Chunking strategy:** one file = one article, ATX headings preserved, `Article URL:` placed on line 3 so it survives truncation. Gemini's File Search Store auto-chunks and embeds each document (`gemini-embedding-001`); we don't control chunk size directly but keep boundaries clean by uploading one article per file.
 
-**Delta logic:** SHA-256 hash of whitespace-normalized content, stored in `state.json`. Unchanged articles are skipped; changed articles are deleted then re-uploaded to avoid duplicate content.
+**Delta logic:** We encode an 8-character SHA-256 hash prefix directly into each uploaded document's display name (`{slug}__{hash8}.md`). On every run, we list the store's current contents to figure out what's already uploaded. Unchanged articles are skipped; changed articles (slug exists but hash differs) are deleted then re-uploaded. Because there is no local `state.json` or state file, this job is entirely disk-free and safe to run in fully ephemeral containers (like Render Cron Jobs).
 
 ## Daily Job Deployment
 
