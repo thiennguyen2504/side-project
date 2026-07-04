@@ -1,0 +1,24 @@
+# Git
+.git/
+.gitignore
+
+# Secrets — KHÔNG bao giờ đưa vào image
+.env
+.env.*
+
+# Runtime-generated (được tạo khi container chạy)
+data/articles/
+logs/
+state.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Dev/docs (không cần trong image production)
+README.md
+.env.sample
+tests/

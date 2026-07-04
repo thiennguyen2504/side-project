@@ -117,28 +117,25 @@ def upload_document(
     client: genai.Client,
     store_name: str,
     file_path: Path,
-) -> Optional[types.Document]:
+) -> Optional["DocRef"]:
     """
     Upload a single Markdown file to the File Search Store.
 
-    Uses upload_to_file_search_store which accepts a file-like object
-    and handles chunking + embedding automatically.
-
     Args:
         client: Authenticated Gemini client.
-        store_name: Fully-qualified store resource name (e.g. 'fileSearchStores/abc123').
+        store_name: Fully-qualified store resource name.
         file_path: Path to the local .md file.
 
     Returns:
-        The Document object with .name set, or None on failure.
+        A DocRef(name=document_resource_name), or None on failure.
     """
     try:
         content = file_path.read_bytes()
         file_obj = io.BytesIO(content)
 
-        result = _with_retry(
+        operation = _with_retry(
             client.file_search_stores.upload_to_file_search_store,
-            name=store_name,
+            file_search_store_name=store_name,
             file=file_obj,
             config=types.UploadToFileSearchStoreConfig(
                 mime_type="text/plain",
@@ -146,35 +143,32 @@ def upload_document(
             ),
             label=f"upload:{file_path.name}",
         )
-        # upload_to_file_search_store returns an Operation; resolve it
-        doc = result if isinstance(result, types.Document) else _resolve_operation(result)
-        logger.debug("Uploaded: %s → %s", file_path.name, doc.name if doc else "?")
-        return doc
+        # upload_to_file_search_store is synchronous — response is already populated.
+        # Structure: operation.response.document_name = 'fileSearchStores/.../documents/...'
+        response = getattr(operation, "response", None)
+        doc_name = getattr(response, "document_name", None)
+        if not doc_name:
+            logger.warning("Upload returned no document_name for '%s'", file_path.name)
+            return None
+        logger.debug("Uploaded: %s → %s", file_path.name, doc_name)
+        return DocRef(name=doc_name)
     except Exception as exc:
         logger.error("Failed to upload '%s': %s", file_path.name, exc)
         return None
 
 
-def _resolve_operation(operation) -> Optional[types.Document]:
-    """
-    Wait for a long-running upload operation to complete and return its result.
 
-    Some SDK versions return an Operation object that must be polled.
-    """
-    # If it already looks like a Document, return it
-    if hasattr(operation, "name") and hasattr(operation, "state"):
-        return operation  # It's a Document with state
-    if hasattr(operation, "result"):
-        # Long-running operation — poll until done
-        max_wait = 120  # seconds
-        elapsed = 0
-        while elapsed < max_wait:
-            if getattr(operation, "done", False):
-                return operation.result()
-            time.sleep(2)
-            elapsed += 2
-        logger.warning("Upload operation did not complete within %ds", max_wait)
-    return operation  # Return as-is; name extraction will work if it has .name
+# ── Simple document reference ──────────────────────────────────────────────────
+
+class DocRef:
+    """Lightweight reference to an uploaded document, compatible with main.py's doc.name usage."""
+    __slots__ = ("name",)
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __repr__(self) -> str:
+        return f"DocRef(name={self.name!r})"
 
 
 # ── Document deletion ──────────────────────────────────────────────────────────
@@ -247,16 +241,12 @@ def upload_all(
 
 # ── Bot Q&A ────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are OptiBot, a customer support assistant for OptiSigns.
-
-Rules:
-1. Answer ONLY based on the information found in the provided support documents.
-2. If the information needed to answer the question is not in the documents, say:
-   "I couldn't find this information in the OptiSigns support documentation."
-3. Do NOT make up or infer information not present in the documents.
-4. Always cite the relevant Article URL(s) at the end of your answer under a
-   "Sources:" section, using the exact Article URL lines from the documents.
-5. Be concise, friendly, and professional.
+SYSTEM_PROMPT = """\
+You are OptiBot, the customer-support bot for OptiSigns.com.
+• Tone: helpful, factual, concise.
+• Only answer using the uploaded docs.
+• Max 5 bullet points; else link to the doc.
+• Cite up to 3 "Article URL:" lines per reply.
 """
 
 

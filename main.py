@@ -12,6 +12,13 @@ Pipeline:
 Exit code is always 0 (partial upload failures are logged, not fatal).
 """
 
+# Load .env file first — must happen before any other import that reads env vars
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not installed (e.g. in Docker where env vars are passed directly)
+
 import hashlib
 import json
 import logging
@@ -37,6 +44,8 @@ def setup_logging() -> logging.Logger:
     """
     Configure root logger to write to both stdout and a timestamped log file.
 
+    Uses UTF-8 for both handlers to avoid Windows charmap issues.
+
     Returns:
         The root logger.
     """
@@ -45,14 +54,18 @@ def setup_logging() -> logging.Logger:
     log_file = LOGS_DIR / f"run_{timestamp}.log"
 
     fmt = "%(asctime)s %(levelname)-8s %(message)s"
-    logging.basicConfig(
-        level=logging.INFO,
-        format=fmt,
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler(log_file, encoding="utf-8"),
-        ],
+
+    # UTF-8 stdout wrapper — avoids UnicodeEncodeError on Windows cp1252 console
+    stdout_handler = logging.StreamHandler(
+        stream=open(sys.stdout.fileno(), mode="w", encoding="utf-8", closefd=False)
     )
+    stdout_handler.setFormatter(logging.Formatter(fmt))
+
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter(fmt))
+
+    logging.basicConfig(level=logging.INFO, handlers=[stdout_handler, file_handler])
+
     logger = logging.getLogger(__name__)
     logger.info("Log file: %s", log_file)
     return logger
