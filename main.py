@@ -2,7 +2,7 @@
 main.py — Daily job entrypoint for OptiBot.
 
 Pipeline:
-  1. Scrape articles from OptiSigns Zendesk Help Center.
+  1. Scrape articles from the Zendesk Help Center.
   2. Compute SHA-256 content hashes (normalised whitespace).
   3. Compare against state.json (previous run).
   4. Upload NEW articles, delete+re-upload CHANGED articles, skip UNCHANGED.

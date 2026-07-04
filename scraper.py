@@ -1,5 +1,5 @@
 """
-scraper.py — Fetches articles from OptiSigns Zendesk Help Center API
+scraper.py — Fetches articles from a Zendesk Help Center API
 and converts them to clean Markdown files saved under data/articles/.
 
 Uses the Zendesk Help Center REST API with pagination support.

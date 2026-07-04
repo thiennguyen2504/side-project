@@ -1,5 +1,5 @@
 """
-uploader.py — Manages the Gemini File Search Store (corpus) for OptiBot.
+uploader.py — Manages the Gemini File Search Store (corpus) for the support bot.
 
 Responsibilities:
   - Create or retrieve an existing File Search Store (no duplicates per run).
@@ -22,7 +22,7 @@ from google import genai
 from google.genai import types
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-STORE_DISPLAY_NAME = "optibot-support-docs"
+STORE_DISPLAY_NAME = "kb-sync-support-docs"
 MODEL_ID = "gemini-3.1-flash-lite"
 MAX_RETRIES = 3
 BACKOFF_BASE = 2  # seconds (exponential: 2, 4, 8)
@@ -242,7 +242,7 @@ def upload_all(
 # ── Bot Q&A ────────────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = """\
-You are OptiBot, the customer-support bot for OptiSigns.com.
+You are a customer-support assistant.
 • Tone: helpful, factual, concise.
 • Only answer using the uploaded docs.
 • Max 5 bullet points; else link to the doc.
@@ -256,7 +256,7 @@ def ask_bot(
     question: str,
 ) -> str:
     """
-    Send a question to OptiBot grounded on the File Search Store.
+    Send a question to the support bot grounded on the File Search Store.
 
     Args:
         client: Authenticated Gemini client.

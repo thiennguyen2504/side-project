@@ -2,8 +2,8 @@
 FROM python:3.12-slim
 
 # Metadata
-LABEL maintainer="OptiBot" \
-      description="OptiSigns support bot — daily scraper job + Streamlit UI"
+LABEL maintainer="kb-sync-bot" \
+      description="Support knowledge bot — daily scraper job + Streamlit UI"
 
 # ── System dependencies ────────────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \

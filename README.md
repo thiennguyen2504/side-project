@@ -1,146 +1,54 @@
-# OptiBot — OptiSigns Support Knowledge Bot
+# Support KB Sync Bot
 
-> A daily-sync pipeline that scrapes the OptiSigns Zendesk Help Center, stores articles in a Gemini File Search Store, and answers support questions via a Streamlit chat UI.
+Daily-sync pipeline that scrapes a Zendesk Help Center, stores articles in a Gemini File Search Store, and answers support questions with cited sources.
 
----
-
-## Quick Setup
+## Setup
 
 ```bash
 git clone https://github.com/thiennguyen2504/side-project.git && cd side-project
 pip install -r requirements.txt
-cp .env.sample .env          # then add your key
-# Windows:  set GEMINI_API_KEY=your_key
-# Linux/Mac: export GEMINI_API_KEY=your_key
+cp .env.sample .env   # add your GEMINI_API_KEY
 ```
+Get a free key at [Google AI Studio](https://aistudio.google.com/app/apikey).
 
-Get a free API key at [Google AI Studio](https://aistudio.google.com/app/apikey).
+## Run Locally
 
----
+| Task | Command |
+|---|---|
+| Daily job (scrape + delta upload) | `python main.py` |
+| Chat UI | `streamlit run app.py` |
+| Tests | `pytest tests/ -v` |
 
-## Running Locally
+Job logs print `added=X, updated=Y, skipped=Z` to stdout and `logs/run_<timestamp>.log`.
 
-### 1. Daily job (scrape + upload delta)
-```bash
-python main.py
-```
-Logs are written to `logs/run_<timestamp>.log` and stdout.  
-Output format: `added=X, updated=Y, skipped=Z`
+## Run with Docker
 
-### 2. Streamlit UI
-```bash
-streamlit run app.py
-```
-Open `http://localhost:8501` in your browser.
-
-### 3. Unit tests
-```bash
-pytest tests/ -v
-```
-
----
-
-## Running with Docker
-
-### Build
 ```bash
 docker build -t optibot .
-```
-
-### Daily job (default CMD)
-```bash
-docker run -e GEMINI_API_KEY=your_key optibot
-```
-Runs `main.py` once and exits with code 0.
-
-### Streamlit UI
-```bash
+docker run -e GEMINI_API_KEY=your_key optibot          # runs main.py once, exits 0
 docker run -e GEMINI_API_KEY=your_key -p 8501:8501 \
   optibot streamlit run app.py --server.port=8501 --server.address=0.0.0.0
 ```
 
----
-
-## Deploying on Render
-
-Two services from **the same Docker image / repo**:
-
-| Service type | Start command |
-|---|---|
-| **Cron Job** | `python main.py` |
-| **Web Service** | `streamlit run app.py --server.port=$PORT --server.address=0.0.0.0` |
-
-Set `GEMINI_API_KEY` as an environment variable in both Render services.
-
----
-
 ## Architecture
 
 ```
-scraper.py          Zendesk Help Center API → clean Markdown files
-     ↓
-main.py             SHA-256 hash diff → delta upload only
-     ↓
-uploader.py         Gemini File Search Store (create / upload / delete)
-     ↓
-app.py              Streamlit chat UI → ask_bot() → grounded response
+scraper.py → clean Markdown  →  main.py (SHA-256 delta) → uploader.py (Gemini File Search Store) → app.py (chat UI)
 ```
 
-### Chunking Strategy
+**Chunking strategy:** one file = one article, ATX headings preserved, `Article URL:` placed on line 3 so it survives truncation. Gemini's File Search Store auto-chunks and embeds each document (`gemini-embedding-001`); we don't control chunk size directly but keep boundaries clean by uploading one article per file.
 
-Files are uploaded as plain-text Markdown (one file per article).  
-Gemini automatically **chunks and embeds** each document using `gemini-embedding-001`.
+**Delta logic:** SHA-256 hash of whitespace-normalized content, stored in `state.json`. Unchanged articles are skipped; changed articles are deleted then re-uploaded to avoid duplicate content.
 
-We influence chunk quality indirectly by:
-- **One file = one article** — keeps chunk boundaries clean.
-- **ATX headings preserved** (`##`, `###`) — the model uses them as section anchors.
-- **`Article URL:` on line 3** (before any heading) — ensures it is always within the first chunk and survives any truncation.
+## Daily Job Deployment
 
-### Hash & Delta Logic
+Deployed on Render as a Cron Job (see deployment guide). Latest run log: **[add your Render log link or screenshot here]**
 
-Each article is hashed with **SHA-256 after whitespace normalisation**:
-1. Trim each line.
-2. Collapse internal runs of spaces to one.
-3. Collapse 2+ blank lines to one.
-4. Hash the result with SHA-256.
+## Sample Query & Screenshot
 
-This means cosmetic reformatting (trailing spaces, extra blank lines) does **not** trigger a re-upload, but any real content change does.
+> "How do I add a YouTube video?"
 
-State is persisted in `state.json`:
-```json
-{
-  "how-to-use-youtube-with-optisigns.md": {
-    "hash": "abc123...",
-    "document_name": "fileSearchStores/xyz/documents/doc1",
-    "updated_at": "2025-01-01T00:00:00+00:00"
-  }
-}
-```
-
-On update: old document is **deleted first**, then new version uploaded — prevents duplicate content in search results.
-
----
-
-## Project Structure
-
-```
-side-project/
-├── main.py              # Daily job entrypoint
-├── scraper.py           # Zendesk API + HTML→Markdown
-├── uploader.py          # Gemini File Search Store logic
-├── app.py               # Streamlit UI
-├── requirements.txt
-├── Dockerfile
-├── .env.sample
-├── README.md
-├── data/articles/*.md   # Scraped articles (gitignored)
-├── logs/                # Run logs (gitignored)
-├── tests/
-│   └── test_hash_diff.py
-└── state.json           # Delta state (gitignored)
-```
-
----
+![Sample answer](docs/sample_answer.png)
 
 ## Environment Variables
 
