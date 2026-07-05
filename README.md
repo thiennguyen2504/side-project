@@ -24,10 +24,10 @@ Job logs print `added=X, updated=Y, skipped=Z` to stdout and `logs/run_<timestam
 ## Run with Docker
 
 ```bash
-docker build -t optibot .
-docker run -e GEMINI_API_KEY=your_key optibot          # runs main.py once, exits 0
+docker build -t chatbot .
+docker run -e GEMINI_API_KEY=your_key chatbot          # runs main.py once, exits 0
 docker run -e GEMINI_API_KEY=your_key -p 8501:8501 \
-  optibot streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+  chatbot streamlit run app.py --server.port=8501 --server.address=0.0.0.0
 ```
 
 ## Architecture

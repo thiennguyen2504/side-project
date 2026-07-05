@@ -1,17 +1,3 @@
-"""
-main.py — Daily job entrypoint for OptiBot.
-
-Pipeline:
-  1. Scrape articles from the Zendesk Help Center.
-  2. Compute SHA-256 content hashes (normalised whitespace).
-  3. Compare against state.json (previous run).
-  4. Upload NEW articles, delete+re-upload CHANGED articles, skip UNCHANGED.
-  5. Write updated state.json.
-  6. Log summary: added=X, updated=Y, skipped=Z.
-
-Exit code is always 0 (partial upload failures are logged, not fatal).
-"""
-
 # Load .env file first — must happen before any other import that reads env vars
 try:
     from dotenv import load_dotenv
@@ -112,7 +98,7 @@ def run() -> None:
     """
     logger = setup_logging()
     logger.info("=" * 60)
-    logger.info("OptiBot daily sync job started")
+    logger.info("Chatbot daily sync job started")
     logger.info("=" * 60)
 
     # ── Step 1: Scrape ────────────────────────────────────────────
