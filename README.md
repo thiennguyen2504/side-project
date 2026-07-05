@@ -42,13 +42,15 @@ scraper.py → clean Markdown  →  main.py (SHA-256 delta) → uploader.py (Gem
 
 ## Daily Job Deployment
 
-Deployed on Render as a Cron Job (see deployment guide). Latest run log: **[add your Render log link or screenshot here]**
+Deployed on Render as a Cron Job (see deployment guide). Latest run log: <img width="2559" height="1525" alt="image" src="https://github.com/user-attachments/assets/3b87c71d-2a16-41a2-8d4f-b8730c7a519d" />
+
 
 ## Sample Query & Screenshot
 
 > "How do I add a YouTube video?"
 
-![Sample answer](docs/sample_answer.png)
+<img width="2542" height="1513" alt="image" src="https://github.com/user-attachments/assets/9c8cf726-30fb-46b2-be14-9f15ce1a720a" />
+
 
 ## Environment Variables
 
