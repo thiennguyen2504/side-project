@@ -30,16 +30,6 @@ docker run -e GEMINI_API_KEY=your_key -p 8501:8501 \
   chatbot streamlit run app.py --server.port=8501 --server.address=0.0.0.0
 ```
 
-## Architecture
-
-```
-scraper.py → clean Markdown  →  main.py (SHA-256 delta) → uploader.py (Gemini File Search Store) → app.py (chat UI)
-```
-
-**Chunking strategy:** one file = one article, ATX headings preserved, `Article URL:` placed on line 3 so it survives truncation. Gemini's File Search Store auto-chunks and embeds each document (`gemini-embedding-001`); we don't control chunk size directly but keep boundaries clean by uploading one article per file.
-
-**Delta logic:** We encode an 8-character SHA-256 hash prefix directly into each uploaded document's display name (`{slug}__{hash8}.md`). On every run, we list the store's current contents to figure out what's already uploaded. Unchanged articles are skipped; changed articles (slug exists but hash differs) are deleted then re-uploaded. Because there is no local `state.json` or state file, this job is entirely disk-free and safe to run in fully ephemeral containers (like Render Cron Jobs).
-
 ## Daily Job Deployment
 
 Deployed on Render as a Cron Job (see deployment guide). Latest run log: <img width="2559" height="1525" alt="image" src="https://github.com/user-attachments/assets/3b87c71d-2a16-41a2-8d4f-b8730c7a519d" />
